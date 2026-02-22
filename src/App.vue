@@ -18,16 +18,16 @@ const draggingTaskId = ref(null);
 const dropHoverKey = ref(null);
 const nextTaskId = ref(5);
 const editingTaskId = ref(null);
-const editingTaskDraft = ref({ title: '', project: '', estimate: 25, dateKey: formatDateKey(today) });
+const editingTaskDraft = ref({ title: '', description: '', project: '', estimate: 25, dateKey: formatDateKey(today) });
 
 const tasks = ref([
-  { id: 1, title: 'Дизайн onboarding flow', project: 'Product', estimate: 45, done: false, dateKey: formatDateKey(today), elapsed: 0 },
-  { id: 2, title: 'Daily standup', project: 'Team', estimate: 15, done: false, dateKey: formatDateKey(today), elapsed: 0 },
-  { id: 3, title: 'Refactor API service', project: 'Engineering', estimate: 60, done: false, dateKey: formatDateKey(addDays(today, 1)), elapsed: 0 },
-  { id: 4, title: 'Аналитика за неделю', project: 'Ops', estimate: 35, done: false, dateKey: formatDateKey(addDays(today, 2)), elapsed: 0 }
+  { id: 1, title: 'Дизайн onboarding flow', description: 'Собрать финальный прототип и передать в разработку.', project: 'Product', estimate: 45, done: false, dateKey: formatDateKey(today), elapsed: 0 },
+  { id: 2, title: 'Daily standup', description: 'Обновить команду по статусам и рискам.', project: 'Team', estimate: 15, done: false, dateKey: formatDateKey(today), elapsed: 0 },
+  { id: 3, title: 'Refactor API service', description: 'Почистить дубли и вынести общие модули.', project: 'Engineering', estimate: 60, done: false, dateKey: formatDateKey(addDays(today, 1)), elapsed: 0 },
+  { id: 4, title: 'Аналитика за неделю', description: 'Собрать метрики и короткие выводы по спринту.', project: 'Ops', estimate: 35, done: false, dateKey: formatDateKey(addDays(today, 2)), elapsed: 0 }
 ]);
 
-const newTask = ref({ title: '', project: '', estimate: 25 });
+const newTask = ref({ title: '', description: '', project: '', estimate: 25 });
 const activeTaskId = ref(null);
 let ticker = null;
 
@@ -67,6 +67,7 @@ function addTask() {
   tasks.value.push({
     id: nextTaskId.value++,
     title: newTask.value.title.trim(),
+    description: newTask.value.description.trim(),
     project: newTask.value.project.trim() || 'General',
     estimate: Number(newTask.value.estimate) || 25,
     done: false,
@@ -74,7 +75,7 @@ function addTask() {
     elapsed: 0
   });
 
-  newTask.value = { title: '', project: '', estimate: 25 };
+  newTask.value = { title: '', description: '', project: '', estimate: 25 };
 }
 
 function toggleTask(taskId) {
@@ -134,6 +135,7 @@ function startEdit(task) {
   editingTaskId.value = task.id;
   editingTaskDraft.value = {
     title: task.title,
+    description: task.description,
     project: task.project,
     estimate: task.estimate,
     dateKey: task.dateKey
@@ -145,6 +147,7 @@ function saveEdit() {
   if (!task) return;
 
   task.title = editingTaskDraft.value.title.trim() || task.title;
+  task.description = editingTaskDraft.value.description.trim();
   task.project = editingTaskDraft.value.project.trim() || 'General';
   task.estimate = Number(editingTaskDraft.value.estimate) || 25;
   task.dateKey = editingTaskDraft.value.dateKey;
@@ -179,6 +182,12 @@ function onDragEnd() {
 }
 
 onBeforeUnmount(() => stopTimer());
+
+const trackerTitle = computed(() => activeTask.value?.title || 'Таймер не запущен');
+const trackerDescription = computed(
+  () => activeTask.value?.description || 'Выберите задачу и нажмите «Старт», чтобы начать мониторинг.'
+);
+const trackerElapsed = computed(() => formatSeconds(activeTask.value?.elapsed || 0));
 </script>
 
 <template>
@@ -248,10 +257,18 @@ onBeforeUnmount(() => stopTimer());
 
         <form class="task-form" @submit.prevent="addTask">
           <input v-model="newTask.title" type="text" placeholder="Что нужно сделать?" />
+          <input v-model="newTask.description" type="text" placeholder="Описание задачи" />
           <input v-model="newTask.project" type="text" placeholder="Проект" />
           <input v-model.number="newTask.estimate" type="number" min="5" step="5" />
           <button type="submit">Добавить</button>
         </form>
+
+        <article class="timer-hero" :class="{ idle: !activeTask }">
+          <p class="timer-hero-label">Реактивный таймер задачи</p>
+          <h3>{{ trackerTitle }}</h3>
+          <p>{{ trackerDescription }}</p>
+          <strong>{{ trackerElapsed }}</strong>
+        </article>
 
         <ul class="task-list">
           <li
@@ -266,6 +283,7 @@ onBeforeUnmount(() => stopTimer());
             <template v-if="editingTaskId === task.id">
               <div class="edit-form">
                 <input v-model="editingTaskDraft.title" type="text" placeholder="Название" />
+                <input v-model="editingTaskDraft.description" type="text" placeholder="Описание" />
                 <input v-model="editingTaskDraft.project" type="text" placeholder="Проект" />
                 <input v-model.number="editingTaskDraft.estimate" type="number" min="5" step="5" />
                 <input v-model="editingTaskDraft.dateKey" type="date" />
@@ -281,6 +299,7 @@ onBeforeUnmount(() => stopTimer());
                 <input :checked="task.done" type="checkbox" @change="toggleTask(task.id)" />
                 <div>
                   <h3 :class="{ done: task.done }">{{ task.title }}</h3>
+                  <p class="description" v-if="task.description">{{ task.description }}</p>
                   <p>{{ task.project }} · {{ task.estimate }} мин</p>
                 </div>
               </div>
@@ -333,10 +352,32 @@ onBeforeUnmount(() => stopTimer());
 .day-cell.selected .task-count { background: rgba(255,255,255,.24); }
 .day-cell.muted { color: #a9b2ca; background: rgba(255,255,255,.4); }
 .day-cell.dropzone { outline: 2px dashed #3f6fff; transform: scale(1.03); }
-.task-form { margin-top: .8rem; display: grid; gap: .5rem; grid-template-columns: 1.4fr 1fr 96px auto; }
+.task-form { margin-top: .8rem; display: grid; gap: .5rem; grid-template-columns: 1.3fr 1.3fr 1fr 96px auto; }
 .task-form input, .task-form button, .task-actions button, .edit-form input { border: none; border-radius: 12px; padding: .55rem .75rem; font: inherit; }
 .task-form input, .edit-form input { background: rgba(255,255,255,.92); }
 .task-form button, .task-actions button { background: #3f6fff; color: #fff; cursor: pointer; }
+.timer-hero {
+  margin-top: .8rem;
+  padding: 1rem;
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(63, 111, 255, 0.18), rgba(123, 150, 255, 0.25));
+  border: 1px solid rgba(63, 111, 255, 0.3);
+  display: grid;
+  gap: .35rem;
+}
+.timer-hero.idle {
+  background: rgba(255,255,255,.75);
+  border-color: rgba(110, 124, 162, 0.22);
+}
+.timer-hero-label { margin: 0; font-size: .74rem; text-transform: uppercase; letter-spacing: .08em; color: #4d5d86; }
+.timer-hero h3 { margin: 0; font-size: 1.05rem; }
+.timer-hero p { margin: 0; color: #5a6787; }
+.timer-hero strong {
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  line-height: 1;
+  letter-spacing: .06em;
+  font-variant-numeric: tabular-nums;
+}
 .task-list { list-style: none; padding: 0; margin: .8rem 0 0; display: grid; gap: .6rem; }
 .task-item { display: flex; justify-content: space-between; gap: .75rem; align-items: center; background: rgba(255,255,255,.82); border-radius: 16px; padding: .75rem; }
 .task-item.running { outline: 2px solid rgba(58,108,255,.5); }
@@ -345,7 +386,8 @@ onBeforeUnmount(() => stopTimer());
 .task-main h3 { margin: 0; font-size: .95rem; }
 .task-main h3.done { text-decoration: line-through; color: #8d97ad; }
 .task-main p { margin: .1rem 0 0; color: #64708c; font-size: .85rem; }
-.edit-form { flex: 1; display: grid; grid-template-columns: 1.3fr 1fr 90px 150px; gap: .45rem; }
+.task-main .description { color: #414f70; font-size: .83rem; max-width: 56ch; }
+.edit-form { flex: 1; display: grid; grid-template-columns: 1.3fr 1.3fr 1fr 90px 150px; gap: .45rem; }
 .task-actions { display: flex; align-items: center; gap: .5rem; }
 .task-actions span { color: #5f6d87; font-variant-numeric: tabular-nums; min-width: 76px; }
 .task-actions .danger { background: #d63f5f; }

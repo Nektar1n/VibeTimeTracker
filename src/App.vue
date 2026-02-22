@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, ref } from 'vue';
+import { addDays, buildCalendarDays, formatDateKey, formatSeconds } from './timeTracker';
 
 const today = new Date();
 const monthCursor = ref(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -57,24 +58,7 @@ const monthLabel = computed(() =>
   })
 );
 
-const calendarDays = computed(() => {
-  const start = new Date(monthCursor.value);
-  start.setDate(1);
-  const offset = (start.getDay() + 6) % 7;
-  start.setDate(start.getDate() - offset);
-
-  return Array.from({ length: 42 }, (_, index) => {
-    const day = new Date(start);
-    day.setDate(start.getDate() + index);
-    const key = formatDateKey(day);
-    return {
-      key,
-      date: day,
-      currentMonth: day.getMonth() === monthCursor.value.getMonth(),
-      hasTasks: tasks.value.some((task) => task.dateKey === key)
-    };
-  });
-});
+const calendarDays = computed(() => buildCalendarDays(monthCursor.value, tasks.value));
 
 const selectedDateLabel = computed(() =>
   new Date(`${selectedDateKey.value}T00:00:00`).toLocaleDateString('ru-RU', {
@@ -147,18 +131,6 @@ function setMonth(direction) {
   monthCursor.value = next;
 }
 
-function formatSeconds(seconds) {
-  const hrs = Math.floor(seconds / 3600)
-    .toString()
-    .padStart(2, '0');
-  const mins = Math.floor((seconds % 3600) / 60)
-    .toString()
-    .padStart(2, '0');
-  const secs = Math.floor(seconds % 60)
-    .toString()
-    .padStart(2, '0');
-  return `${hrs}:${mins}:${secs}`;
-}
 
 function onDragStart(taskId) {
   draggingTaskId.value = taskId;
@@ -172,18 +144,7 @@ function onDrop(dayKey) {
   draggingTaskId.value = null;
 }
 
-function addDays(date, days) {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
-}
 
-function formatDateKey(date) {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 onBeforeUnmount(() => stopTimer());
 </script>
@@ -271,9 +232,9 @@ onBeforeUnmount(() => stopTimer());
             </div>
             <div class="task-actions">
               <span>{{ formatSeconds(task.elapsed) }}</span>
-              <button v-if="activeTask?.id !== task.id" @click="startTimer(task.id)">Start</button>
-              <button v-else class="danger" @click="stopTimer">Stop</button>
-              <button class="ghost" @click="deleteTask(task.id)">✕</button>
+              <button type="button" v-if="activeTask?.id !== task.id" @click="startTimer(task.id)">Start</button>
+              <button type="button" v-else class="danger" @click="stopTimer">Stop</button>
+              <button type="button" class="ghost" @click="deleteTask(task.id)">✕</button>
             </div>
           </li>
         </ul>
